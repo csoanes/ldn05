@@ -23,10 +23,12 @@ fun main(args: Array<String>) {
     // No permissions required as we are not invoking flows.
     val user = User("user1", "test", permissions = setOf())
     driver(dsl = {
-        startNode("Controller", setOf(ServiceInfo(ValidatingNotaryService.type)))
-        startNode("NodeA", rpcUsers = listOf(user))
-        startNode("NodeB", rpcUsers = listOf(user))
-        startNode("NodeC", rpcUsers = listOf(user))
+        startNode("RateAgent")
+//        startNode("Regulator")
+//        startNode("Notary", setOf(ServiceInfo(ValidatingNotaryService.type)))
+        startNode("Credit Suisse", rpcUsers = listOf(user))
+//        startNode("BankB", rpcUsers = listOf(user))
+//        startNode("BankC", rpcUsers = listOf(user))
         waitForAllNodesToFinish()
     }, isDebug = true)
 }
