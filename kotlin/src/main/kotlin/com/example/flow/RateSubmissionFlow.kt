@@ -4,6 +4,7 @@ import co.paralleluniverse.fibers.Suspendable
 import com.example.contract.RateSubmissionState
 import com.example.flow.RateSubmissionFlow.Acceptor
 import com.example.flow.RateSubmissionFlow.Initiator
+import com.example.service.LiborRateCalculator
 import net.corda.core.contracts.DealState
 import net.corda.core.contracts.TransactionState
 import net.corda.core.crypto.Party
@@ -93,45 +94,48 @@ object RateSubmissionFlow {
                 // Flow jumps to Acceptor.
                 // -----------------------
                 progressTracker.currentStep = RECEIVED_PARTIAL_TRANSACTION
-                val ptx = sendAndReceive<SignedTransaction>(otherParty, offerMessage).unwrap { stx ->
-                    // Stage 7.
-                    // Receive the partially signed transaction off the wire from the other party.
-                    // Check that the signature of the other party is valid.
-                    // Our signature and the Notary's signature are allowed to be omitted at this stage as this is only a
-                    // partially signed transaction.
-                    progressTracker.currentStep = VERIFYING
-                    val wtx: WireTransaction = stx.verifySignatures(myKeyPair.public.composite, notaryPubKey)
-                    // Run the contract's verify function.
-                    // We want to be sure that the PurchaseOrderState agreed upon is a valid instance of an PurchaseOrderContract, to do
-                    // this we need to run the contract's verify() function.
-                    wtx.toLedgerTransaction(serviceHub).verify()
-                    // We've verified the signed transaction, return it
-                    stx
-                }
+//                val ptx = send(otherParty, offerMessage)
+                send(otherParty, offerMessage)
+//                        .unwrap { stx ->
+//                    // Stage 7.
+//                    // Receive the partially signed transaction off the wire from the other party.
+//                    // Check that the signature of the other party is valid.
+//                    // Our signature and the Notary's signature are allowed to be omitted at this stage as this is only a
+//                    // partially signed transaction.
+//                    progressTracker.currentStep = VERIFYING
+//                    val wtx: WireTransaction = stx.verifySignatures(myKeyPair.public.composite, notaryPubKey)
+//                    // Run the contract's verify function.
+//                    // We want to be sure that the PurchaseOrderState agreed upon is a valid instance of an PurchaseOrderContract, to do
+//                    // this we need to run the contract's verify() function.
+//                    wtx.toLedgerTransaction(serviceHub).verify()
+//                    // We've verified the signed transaction, return it
+//                    stx
+//                }
                 // Stage 8.
                 progressTracker.currentStep = SIGNING
                 // Sign the transaction with our key pair and add it to the transaction.
                 // We now have 'validation consensus'. We still require uniqueness consensus.
                 // Technically validation consensus for this type of agreement implicitly provides uniqueness consensus.
-                val mySig = myKeyPair.signWithECDSA(ptx.id.bytes)
+//                val mySig = myKeyPair.signWithECDSA(ptx.id.bytes)
                 // '+' in this case is just an overloaded operator defined in 'signedTransaction.kt'.
-                val vtx = ptx + mySig
+//                val vtx = ptx + mySig
                 // Stage 9.
                 progressTracker.currentStep = NOTARY
                 // Obtain the notary's signature.
                 // We do this by firing-off a sub-flow. This illustrates the power of protocols as reusable workflows.
-                val notarySignature = subFlow(NotaryFlow.Client(vtx))
+//                val notarySignature = subFlow(NotaryFlow.Client(vtx))
                 // Add the notary signature to the transaction.
-                val ntx = vtx + notarySignature
+//                val ntx = vtx + notarySignature
                 // Stage 10.
                 progressTracker.currentStep = RECORDING
                 // Record the transaction in our vault.
-                serviceHub.recordTransactions(listOf(ntx))
+//                serviceHub.recordTransactions(listOf(ntx))
                 // Stage 11.
                 progressTracker.currentStep = SENDING_FINAL_TRANSACTION
                 // Send a copy of the transaction to our counter-party.
-                send(otherParty, ntx)
-                return RateSubmissionFlowResult.Success("Transaction id ${ntx.id} committed to ledger.")
+//                send(otherParty, ntx)
+//                return RateSubmissionFlowResult.Success("Transaction id ${ntx.id} committed to ledger.")
+                return RateSubmissionFlowResult.Success("Rate sent")
             } catch(ex: Exception) {
                 // Just catch all exception types.
                 return RateSubmissionFlowResult.Failure(ex.message)
@@ -139,21 +143,22 @@ object RateSubmissionFlow {
         }
     }
 
-    class Acceptor(val otherParty: Party): FlowLogic<RateSubmissionFlowResult>() {
+    class Acceptor(val otherParty: Party, liborRateCalculator: LiborRateCalculator): FlowLogic<RateSubmissionFlowResult>() {
+
+        val liborRateCalculator = liborRateCalculator;
+
         companion object {
-            object WAITING_FOR_PROPOSAL : ProgressTracker.Step("Receiving proposed purchase order from buyer.")
-            object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on proposed purchase order.")
-            object SIGNING : ProgressTracker.Step("Signing proposed transaction with our private key.")
-            object SEND_TRANSACTION_AND_WAIT_FOR_RESPONSE : ProgressTracker.Step("Sending partially signed transaction to buyer and wait for a response.")
-            object VERIFYING_TRANSACTION : ProgressTracker.Step("Verifying signatures and contract constraints.")
+            object WAITING_FOR_RATE : ProgressTracker.Step("Receiving submitted rate from bank.")
+//            object ACKNOWLEDGING_RATE : ProgressTracker.Step("Acknowledging submitted rate from bank.")
+            object CALCULATING_FIXED_RATE : ProgressTracker.Step("Got all submitted rates, calculating fixed rate.")
+            object BROADCASTING_FIXED_RATE : ProgressTracker.Step("Calculated fixed rate, broadcasting it.")
             object RECORDING : ProgressTracker.Step("Recording transaction in vault.")
 
             fun tracker() = ProgressTracker(
-                    WAITING_FOR_PROPOSAL,
-                    GENERATING_TRANSACTION,
-                    SIGNING,
-                    SEND_TRANSACTION_AND_WAIT_FOR_RESPONSE,
-                    VERIFYING_TRANSACTION,
+                    WAITING_FOR_RATE,
+//                    ACKNOWLEDGING_RATE,
+                    CALCULATING_FIXED_RATE,
+                    BROADCASTING_FIXED_RATE,
                     RECORDING
             )
         }
@@ -167,42 +172,46 @@ object RateSubmissionFlow {
                 // Obtain a reference to our key pair.
                 val keyPair = serviceHub.legalIdentityKey
                 // Stage 3.
-                progressTracker.currentStep = WAITING_FOR_PROPOSAL
+                progressTracker.currentStep = WAITING_FOR_RATE
                 // All messages come off the wire as UntrustworthyData. You need to 'unwrap' it. This is an appropriate
                 // place to perform some validation over what you have just received.
                 val message = receive<TransactionState<DealState>>(otherParty).unwrap { it }
-                // Stage 4.
-                progressTracker.currentStep = GENERATING_TRANSACTION
-                // Generate an unsigned transaction. See PurchaseOrderState for further details.
-                val utx = message.data.generateAgreement(message.notary)
-                // Add a timestamp as the contract code in PurchaseOrderContract mandates that ExampleStates are timestamped.
-                val currentTime = serviceHub.clock.instant()
-                // As we are running in a distributed system, we allocate a 30 second time window for the transaction to
-                // be timestamped by the Notary service.
-                utx.setTime(currentTime, 30.seconds)
-                // Stage 5.
-                progressTracker.currentStep = SIGNING
-                val stx = utx.signWith(keyPair).toSignedTransaction(checkSufficientSignatures = false)
-                // Stage 6.
-                // ------------------------
-                // Flow jumps to Initiator.
-                // ------------------------
-                progressTracker.currentStep = SEND_TRANSACTION_AND_WAIT_FOR_RESPONSE
-                // Stage 12.
-                // Receive the notarised transaction off the wire.
-                val ntx = sendAndReceive<SignedTransaction>(otherParty, stx).unwrap { stx ->
-                    progressTracker.currentStep = VERIFYING_TRANSACTION
-                    // Validate transaction.
-                    // No need to allow for any omited signatures as everyone should have signed.
-                    stx.verifySignatures()
-                    // Check it's valid.
-                    stx.toLedgerTransaction(serviceHub).verify()
-                    stx
-                }
+                val rateSubmissionMessage = message.data as RateSubmissionState
+                println("Submitted Rate: " + rateSubmissionMessage.rateSubmission.Rate)
+//                // Stage 4.
+////                progressTracker.currentStep = GENERATING_TRANSACTION
+//                // Generate an unsigned transaction. See PurchaseOrderState for further details.
+//                val utx = message.data.generateAgreement(message.notary)
+//                // Add a timestamp as the contract code in PurchaseOrderContract mandates that ExampleStates are timestamped.
+//                val currentTime = serviceHub.clock.instant()
+//                // As we are running in a distributed system, we allocate a 30 second time window for the transaction to
+//                // be timestamped by the Notary service.
+//                utx.setTime(currentTime, 30.seconds)
+//                // Stage 5.
+//                progressTracker.currentStep = SIGNING
+//                val stx = utx.signWith(keyPair).toSignedTransaction(checkSufficientSignatures = false)
+//                // Stage 6.
+//                // ------------------------
+//                // Flow jumps to Initiator.
+//                // ------------------------
+//                progressTracker.currentStep = SEND_TRANSACTION_AND_WAIT_FOR_RESPONSE
+//                // Stage 12.
+//                // Receive the notarised transaction off the wire.
+//                val ntx = sendAndReceive<SignedTransaction>(otherParty, stx).unwrap { stx ->
+//                    progressTracker.currentStep = VERIFYING_TRANSACTION
+//                    // Validate transaction.
+//                    // No need to allow for any omited signatures as everyone should have signed.
+//                    stx.verifySignatures()
+//                    // Check it's valid.
+//                    stx.toLedgerTransaction(serviceHub).verify()
+//                    stx
+//                }
                 // Record the transaction.
                 progressTracker.currentStep = RECORDING
-                serviceHub.recordTransactions(listOf(ntx))
-                return RateSubmissionFlowResult.Success("Transaction id ${ntx.id} committed to ledger.")
+//                serviceHub.recordTransactions(listOf(ntx))
+//                liborRateCalculator.receiveSubmittedRate(message.data.contract)
+//                return RateSubmissionFlowResult.Success("Transaction id ${ntx.id} committed to ledger.")
+                return RateSubmissionFlowResult.Success("Transaction id committed to ledger.")
             } catch (ex: Exception) {
                 return RateSubmissionFlowResult.Failure(ex.message)
             }

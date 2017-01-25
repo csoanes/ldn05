@@ -78,6 +78,7 @@ open class RateSubmissionContract() : Contract {
                                 groupingKey: UniqueIdentifier?): Set<Commands> {
                 val command = tx.commands.requireSingleCommand<Commands.Place>()
                 requireThat {
+//                    "No collusion, please. The receiver must be the RateAgent." by (outputs.get(0).Calculator.name == "RateAgent")
                     /*
                     // Generic constraints around generation of the issue purchase order transaction.
                     "No inputs should be consumed when issuing a purchase order." by (inputs.isEmpty())

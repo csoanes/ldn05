@@ -62,6 +62,8 @@ app.controller('ModalInstanceCtrl', function ($http, $location, $uibModalInstanc
 
     modalInstance.peers = peers;
     modalInstance.form = {};
+    modalInstance.form.rate = '1.2345';
+    modalInstance.form.volume = '100';
     modalInstance.formError = false;
     modalInstance.items = [{}];
 
@@ -82,7 +84,7 @@ app.controller('ModalInstanceCtrl', function ($http, $location, $uibModalInstanc
 
             const createPoEndpoint =
                 apiBaseURL +
-                "Controller/submit-rate";
+                "RateAgent/submit-rate";
 
             // Create PO and handle success / fail responses.
             $http.put(createPoEndpoint, angular.toJson(rate)).then(

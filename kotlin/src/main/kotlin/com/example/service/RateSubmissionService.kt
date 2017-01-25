@@ -16,7 +16,7 @@ import net.corda.core.node.PluginServiceHub
 object RateSubmissionService {
     class Service(services: PluginServiceHub) {
         init {
-            services.registerFlowInitiator(RateSubmissionFlow.Initiator::class) { RateSubmissionFlow.Acceptor(it) }
+            services.registerFlowInitiator(RateSubmissionFlow.Initiator::class) { RateSubmissionFlow.Acceptor(it, LiborRateCalculator()) }
         }
     }
 }
