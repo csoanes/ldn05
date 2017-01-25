@@ -49,7 +49,7 @@ app.controller('DemoAppController', function($http, $location, $uibModal) {
         modalInstance.result.then(() => {}, () => {});
     };
 
-    demoApp.getPOs = () => $http.get(apiBaseURL + "submitted-rates")
+    demoApp.getPOs = () => $http.get(apiBaseURL + "purchase-orders")
         .then((response) => demoApp.pos = Object.keys(response.data)
             .map((key) => response.data[key].state.data)
             .reverse());
@@ -66,31 +66,26 @@ app.controller('ModalInstanceCtrl', function ($http, $location, $uibModalInstanc
     modalInstance.items = [{}];
 
     // Validate and create purchase order.
-    modalInstance.create = () => {
+    modalInstance.send = () => {
         if (invalidFormInput()) {
             modalInstance.formError = true;
         } else {
             modalInstance.formError = false;
 
-            const po = {
-                orderNumber: modalInstance.form.orderNumber,
-                deliveryDate: modalInstance.form.deliveryDate,
-                deliveryAddress: {
-                    city: modalInstance.form.city,
-                    country: modalInstance.form.country.toUpperCase()
-                },
-                items: modalInstance.items
+            const rate = {
+                submissionId: Node,
+                Rate: modalInstance.form.rate,
+                Volume: modalInstance.form.volume
             };
 
             $uibModalInstance.close();
 
             const createPoEndpoint =
                 apiBaseURL +
-                modalInstance.form.counterparty +
-                "/submit-rate";
+                "Controller/submit-rate";
 
             // Create PO and handle success / fail responses.
-            $http.put(createPoEndpoint, angular.toJson(po)).then(
+            $http.put(createPoEndpoint, angular.toJson(rate)).then(
                 (result) => modalInstance.displayMessage(result),
                 (result) => modalInstance.displayMessage(result)
             );
@@ -120,19 +115,13 @@ app.controller('ModalInstanceCtrl', function ($http, $location, $uibModalInstanc
 
     // Validate the purchase order.
     function invalidFormInput() {
-        const invalidNonItemFields = !modalInstance.form.orderNumber
-            || isNaN(modalInstance.form.orderNumber)
-            || !modalInstance.form.deliveryDate
-            || !modalInstance.form.city
-            || !modalInstance.form.country;
+        const invalidNonItemFields = isNaN(modalInstance.form.rate)
+            || isNaN(modalInstance.form.volume);
 
-        const inValidCounterparty = modalInstance.form.counterparty === undefined;
+        //const inValidCounterparty = modalInstance.form.counterparty === undefined;
 
-        const invalidItemFields = modalInstance.items
-            .map(item => !item.name || !item.amount || isNaN(item.amount))
-            .reduce((prev, curr) => prev && curr);
 
-        return invalidNonItemFields || inValidCounterparty || invalidItemFields;
+        return invalidNonItemFields;
     }
 });
 

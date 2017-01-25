@@ -6,9 +6,8 @@ import com.example.contract.RateSubmissionContract
 import com.example.contract.RateSubmissionState
 import com.example.flow.RateSubmissionFlow
 import com.example.flow.RateSubmissionFlowResult
-import com.example.model.EvidenceTrades
+//import com.example.model.EvidenceTrades
 import com.example.model.RateSubmission
-import com.example.service.ExampleService
 import com.example.service.RateSubmissionService
 import net.corda.core.crypto.Party
 import net.corda.core.messaging.CordaRPCOps
@@ -57,7 +56,7 @@ class RateSubmissionPlugin : CordaPluginRegistry() {
         kryo.register(RateSubmissionState::class.java)
         kryo.register(RateSubmissionContract::class.java)
         kryo.register(RateSubmission::class.java)
-        kryo.register(EvidenceTrades::class.java)
+ //       kryo.register(EvidenceTrades::class.java)
         kryo.register(Date::class.java)
         kryo.register(RateSubmissionFlowResult.Success::class.java)
         kryo.register(RateSubmissionFlowResult.Failure::class.java)

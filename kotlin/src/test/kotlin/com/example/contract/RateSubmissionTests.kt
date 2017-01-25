@@ -28,9 +28,9 @@ class RateSubmissionTests {
 //        val items = listOf(Item("Hammer", 1))
 //        val deliveryTime = TEST_TX_TIME.plus(Duration.ofDays(7))arty
 //        val purchaseOrder = PurchaseOrder(1, Date(deliveryTime.toEpochMilli()), address, items)
-        val evidence = listOf(EvidenceTrades("123", 1.3f, 200f));
+//        val evidence = listOf(EvidenceTrades("123", 1.3f, 200f));
         val Rate = 1.2345f
-        val rateSubmission = RateSubmission(1, Rate, 1000f, evidence)
+        val rateSubmission = RateSubmission(1, Rate, 1000f/*, evidence*/)
         ledger {
             transaction {
                 output { RateSubmissionState(rateSubmission, CREDIT_SUISSE, CALCULATOR, Date(), "LIBOR", "EUR", RateSubmissionContract()) }

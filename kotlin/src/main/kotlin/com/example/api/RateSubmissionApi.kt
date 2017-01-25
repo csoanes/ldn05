@@ -58,15 +58,13 @@ class RateSubmissionApi(val services: CordaRPCOps) {
      */
     @PUT
     @Path("{party}/submit-rate")
-    fun createRateSubmission(@PathParam("party") partyName: String): Response {
-//    fun createRateSubmission(rateSubmission: RateSubmission, @PathParam("party") partyName: String): Response {
+  fun createRateSubmission(rateSubmission: RateSubmission, @PathParam("party") partyName: String): Response {
         val otherParty = services.partyFromName(partyName)
         if (otherParty == null) {
             return Response.status(Response.Status.BAD_REQUEST).build()
         }
 
-        val rateSubmission = RateSubmission(123, 1.345f, 100f);
-
+       
         val state = RateSubmissionState(
                 rateSubmission,
                 services.nodeIdentity().legalIdentity,
