@@ -76,8 +76,8 @@ data class RateSubmissionState(val rateSubmission: RateSubmission,
                     rate = rateSubmission.Rate,
                     rateDate = this.RateDate,
                     rateType = this.RateType,
-                    currency = this.Currency,
-                    evidenceTrades = ""
+                    currency = this.Currency
+//                    evidenceTrades = ""
             )
             else -> throw IllegalArgumentException("Unrecognised schema $schema")
         }

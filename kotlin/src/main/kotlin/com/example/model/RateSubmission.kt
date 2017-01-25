@@ -9,5 +9,4 @@ data class EvidenceTrades(val DealNum: String, val Rate: Float,val Notional: Flo
 
 data class RateSubmission(val submissionID: Int,
                          val Rate: Float,
-                         val Volume: Float,
-                         val EvidenceTrades: List<EvidenceTrades>)
+                         val Volume: Float)

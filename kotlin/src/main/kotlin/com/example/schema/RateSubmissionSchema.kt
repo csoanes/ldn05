@@ -36,10 +36,10 @@ object RateSubmissionSchemaV1 : MappedSchema(
             var rateType: String,
 
             @Column(name = "currency")
-            var currency: String,
+            var currency: String
 
-            @Column(name = "evidenceTrades")
-            var evidenceTrades: String
+//            @Column(name = "evidenceTrades")
+//            var evidenceTrades: String
 
     ) : PersistentState()
 }
