@@ -14,9 +14,11 @@ import net.corda.core.node.PluginServiceHub
  * [ExampleFlow.Acceptor] flow.
  */
 object RateSubmissionService {
+
+    val liborRateCalculator: LiborRateCalculator = LiborRateCalculator()
     class Service(services: PluginServiceHub) {
         init {
-            services.registerFlowInitiator(RateSubmissionFlow.Initiator::class) { RateSubmissionFlow.Acceptor(it, LiborRateCalculator()) }
+            services.registerFlowInitiator(RateSubmissionFlow.Initiator::class) { RateSubmissionFlow.Acceptor(it, liborRateCalculator)}
         }
     }
 }

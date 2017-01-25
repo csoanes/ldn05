@@ -1,15 +1,13 @@
 package com.example.service
 
-import net.corda.core.schemas.MappedSchema
-import net.corda.core.schemas.PersistentState
 import java.util.*
 
 
-class LiborRateCalculator {
+class LiborRateCalculator() {
 
     val rates = HashMap<String, Float>();
 
-    fun receiveSubmittedRate(rate: Float, bankName: String) {
+    fun receiveSubmittedRate(rate: Float, bankName: String) :FixedRateResult {
 
         if (rates.containsKey(bankName)) {
             println("Overriding rate for " + bankName)
@@ -17,6 +15,7 @@ class LiborRateCalculator {
 
         rates.put(bankName, rate);
 
+        println("rates maps $rates")
         if (rates.size == 2) {
             println("kicking off calculation")
 
@@ -24,12 +23,14 @@ class LiborRateCalculator {
             val fixedRate = sum / 2;
             println("Fixed Rate: " + fixedRate)
 
-            broadcastRate(fixedRate)
+            rates.clear()
+            return FixedRateResult(true, fixedRate)
+        } else {
+            return FixedRateResult(false, 0f)
         }
     }
 
-    private fun broadcastRate(fixedRate: Float) {
+    class FixedRateResult(val isReady: Boolean, val rate: Float) {
 
-        //start fixed rate flow somehow
     }
 }

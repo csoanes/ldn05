@@ -1,10 +1,12 @@
 package com.example.api
 
+import com.example.Hackathon
 import com.example.contract.RateSubmissionContract
 import com.example.contract.RateSubmissionState
 import com.example.flow.RateSubmissionFlow
 import com.example.flow.RateSubmissionFlowResult
 import com.example.model.RateSubmission
+import com.example.service.LiborRateCalculator
 import net.corda.core.messaging.CordaRPCOps
 import net.corda.core.messaging.startFlow
 import java.util.*
@@ -45,6 +47,12 @@ class RateSubmissionApi(val services: CordaRPCOps) {
     @Path("submitted-rates")
     @Produces(MediaType.APPLICATION_JSON)
     fun getSubmittedRates() = services.vaultAndUpdates().first
+
+
+    @GET
+    @Path("fixed-rate")
+    @Produces(MediaType.APPLICATION_JSON)
+    fun getFixedRate() = Hackathon.getFixedRate()
 
     /**
      * This should only be called from the 'buyer' node. It initiates a flow to agree a purchase order with a

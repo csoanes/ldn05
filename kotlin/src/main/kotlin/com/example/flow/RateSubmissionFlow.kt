@@ -1,21 +1,21 @@
 package com.example.flow
 
 import co.paralleluniverse.fibers.Suspendable
+import com.example.Hackathon
+import com.example.contract.RateSubmissionContract
 import com.example.contract.RateSubmissionState
 import com.example.flow.RateSubmissionFlow.Acceptor
 import com.example.flow.RateSubmissionFlow.Initiator
+import com.example.model.RateSubmission
 import com.example.service.LiborRateCalculator
 import net.corda.core.contracts.DealState
 import net.corda.core.contracts.TransactionState
 import net.corda.core.crypto.Party
-import net.corda.core.crypto.composite
-import net.corda.core.crypto.signWithECDSA
 import net.corda.core.flows.FlowLogic
 import net.corda.core.seconds
 import net.corda.core.transactions.SignedTransaction
-import net.corda.core.transactions.WireTransaction
 import net.corda.core.utilities.ProgressTracker
-import net.corda.flows.NotaryFlow
+import java.util.*
 
 /**
  * This is the "Hello World" of flows!
@@ -36,6 +36,8 @@ import net.corda.flows.NotaryFlow
  * explains each stage of the flow.
  */
 object RateSubmissionFlow {
+
+
     class Initiator(val rateSubmissionState: RateSubmissionState,
                     val otherParty: Party): FlowLogic<RateSubmissionFlowResult>() {
         /**
@@ -143,22 +145,22 @@ object RateSubmissionFlow {
         }
     }
 
-    class Acceptor(val otherParty: Party, liborRateCalculator: LiborRateCalculator): FlowLogic<RateSubmissionFlowResult>() {
-
-        val liborRateCalculator = liborRateCalculator;
+    class Acceptor(val otherParty: Party, val liborRateCalculator: LiborRateCalculator): FlowLogic<RateSubmissionFlowResult>() {
 
         companion object {
-            object WAITING_FOR_RATE : ProgressTracker.Step("Receiving submitted rate from bank.")
-//            object ACKNOWLEDGING_RATE : ProgressTracker.Step("Acknowledging submitted rate from bank.")
-            object CALCULATING_FIXED_RATE : ProgressTracker.Step("Got all submitted rates, calculating fixed rate.")
-            object BROADCASTING_FIXED_RATE : ProgressTracker.Step("Calculated fixed rate, broadcasting it.")
+            object WAITING_FOR_PROPOSAL : ProgressTracker.Step("Receiving proposed purchase order from buyer.")
+            object GENERATING_TRANSACTION : ProgressTracker.Step("Generating transaction based on proposed purchase order.")
+            object SIGNING : ProgressTracker.Step("Signing proposed transaction with our private key.")
+            object SEND_TRANSACTION_AND_WAIT_FOR_RESPONSE : ProgressTracker.Step("Sending partially signed transaction to buyer and wait for a response.")
+            object VERIFYING_TRANSACTION : ProgressTracker.Step("Verifying signatures and contract constraints.")
             object RECORDING : ProgressTracker.Step("Recording transaction in vault.")
 
             fun tracker() = ProgressTracker(
-                    WAITING_FOR_RATE,
-//                    ACKNOWLEDGING_RATE,
-                    CALCULATING_FIXED_RATE,
-                    BROADCASTING_FIXED_RATE,
+                    WAITING_FOR_PROPOSAL,
+                    GENERATING_TRANSACTION,
+                    SIGNING,
+                    SEND_TRANSACTION_AND_WAIT_FOR_RESPONSE,
+                    VERIFYING_TRANSACTION,
                     RECORDING
             )
         }
@@ -172,14 +174,23 @@ object RateSubmissionFlow {
                 // Obtain a reference to our key pair.
                 val keyPair = serviceHub.legalIdentityKey
                 // Stage 3.
-                progressTracker.currentStep = WAITING_FOR_RATE
+                progressTracker.currentStep = WAITING_FOR_PROPOSAL
                 // All messages come off the wire as UntrustworthyData. You need to 'unwrap' it. This is an appropriate
                 // place to perform some validation over what you have just received.
                 val message = receive<TransactionState<DealState>>(otherParty).unwrap { it }
                 val rateSubmissionMessage = message.data as RateSubmissionState
-                println("Submitted Rate: " + rateSubmissionMessage.rateSubmission.Rate)
-//                // Stage 4.
-////                progressTracker.currentStep = GENERATING_TRANSACTION
+                val rate = rateSubmissionMessage.rateSubmission.Rate
+                val fromName = rateSubmissionMessage.Submitter.name
+                val thisParty = message.data.parties.filter { party -> party.name == "RateAgent" }.get(0)
+                val thisName = thisParty.name
+                if (fromName == "RateAgent") {
+                    println("$thisName: Fixed rate received from agent " + rate)
+                    return RateSubmissionFlowResult.Success("Fixed rate received from agent")
+                } else {
+                    println("$thisName: Submitted Rate: $rate from $fromName")
+                }
+                // Stage 4.
+//                progressTracker.currentStep = GENERATING_TRANSACTION
 //                // Generate an unsigned transaction. See PurchaseOrderState for further details.
 //                val utx = message.data.generateAgreement(message.notary)
 //                // Add a timestamp as the contract code in PurchaseOrderContract mandates that ExampleStates are timestamped.
@@ -188,7 +199,7 @@ object RateSubmissionFlow {
 //                // be timestamped by the Notary service.
 //                utx.setTime(currentTime, 30.seconds)
 //                // Stage 5.
-//                progressTracker.currentStep = SIGNING
+//                progressTracker.currentStep = Initiator.Companion.SIGNING
 //                val stx = utx.signWith(keyPair).toSignedTransaction(checkSufficientSignatures = false)
 //                // Stage 6.
 //                // ------------------------
@@ -209,9 +220,29 @@ object RateSubmissionFlow {
                 // Record the transaction.
                 progressTracker.currentStep = RECORDING
 //                serviceHub.recordTransactions(listOf(ntx))
-//                liborRateCalculator.receiveSubmittedRate(message.data.contract)
+                val calculationResult = liborRateCalculator.receiveSubmittedRate(rate, fromName)
+                if (calculationResult.isReady) {
+                    println("Fixed rate ready. Kicking off broadcast flow")
+                    val fixedRate = calculationResult.rate
+
+                    Hackathon.setFixedRate(fixedRate.toString())
+
+                    val state = RateSubmissionState(
+                            RateSubmission(123, fixedRate, 111f),
+//                            services.nodeIdentity().legalIdentity,
+                            thisParty,
+                            otherParty,
+                            Date(),
+                            "LIBOR",
+                            "EUR",
+                            RateSubmissionContract())
+
+                    println("Sending fixed rate to otherparty $otherParty")
+//                    subFlow(RateSubmissionFlow.Initiator(state, otherParty))
+//                    subFlow(RateSubmissionFlow.Initiator(state, thisParty))
+                }
 //                return RateSubmissionFlowResult.Success("Transaction id ${ntx.id} committed to ledger.")
-                return RateSubmissionFlowResult.Success("Transaction id committed to ledger.")
+                return RateSubmissionFlowResult.Success("Rate received by calculator")
             } catch (ex: Exception) {
                 return RateSubmissionFlowResult.Failure(ex.message)
             }

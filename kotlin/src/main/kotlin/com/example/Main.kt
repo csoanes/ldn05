@@ -28,6 +28,7 @@ fun main(args: Array<String>) {
 //        startNode("Regulator")
 //        startNode("Notary", setOf(ServiceInfo(ValidatingNotaryService.type)))
         startNode("Credit Suisse", rpcUsers = listOf(user))
+        startNode("Barclays", rpcUsers = listOf(user))
 //        startNode("BankB", rpcUsers = listOf(user))
 //        startNode("BankC", rpcUsers = listOf(user))
         waitForAllNodesToFinish()
